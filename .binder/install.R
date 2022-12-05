@@ -1,0 +1,15 @@
+install.packages(
+  "data.table",
+  "dplyr",
+  "ggthemes",
+  "gitcreds",
+  "knitr",
+  "lubridate",
+  "remotes",
+  "renv",
+  "rmarkdown",
+  "sketchy",
+  "stringr",
+  "tidyverse",
+  "usethis"
+)
