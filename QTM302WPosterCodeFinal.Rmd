@@ -1,0 +1,413 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(ggthemes)
+
+setwd("/Users/gamer/Downloads")
+Mort2020 <- fread("Mort2020US.PubUse.csv", nrows = 200000)
+Mort2019 <- fread("Mort2019US.PubUse.csv" , nrows = 200000)
+```
+
+
+
+
+
+```{r}
+install.packages("renv", type = "binary")
+library(renv)
+renv::init()
+
+
+
+install.packages("remotes", type = "binary")
+remotes::install_github("maRce10/sketchy")
+
+library(sketchy)
+path = getwd() %>% dirname()
+name = getwd() %>% basename()
+sketchy::make_compendium(name = name,
+                         path = path,
+                        force=TRUE, #Note: force will *not* overwrite any files or folders, but put contents in a folder of the same name
+                         format = "small_compendium", #one of many options,
+                         readme = TRUE)
+```
+
+
+
+```{r}
+library(usethis)
+library(gitcreds)
+usethis::gh_token_help()
+usethis::create_github_token()
+gitcreds::gitcreds_set()
+
+gitcreds_get()
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+gc() #Clears junk memory
+Mort2020 <- Mort2020 %>%
+  filter(ucod == "X40" | ucod == "X41" | ucod == "X42" | ucod == "X43" | ucod == "X44"| ucod == "X60"| ucod == "X61" | ucod == "X62" | ucod == "X63" | ucod == "X64"
+         | ucod == "X85" | ucod == "Y10" | ucod == "Y11" | ucod == "Y12" | ucod == "Y13" | ucod == "Y14") %>% 
+  filter(enicon_1 == "T400" | enicon_1 == "T401" | enicon_1 == "T402" | enicon_1 == "T403" | enicon_1 == "T404" | enicon_1 == "T406")
+
+#Remove unnecessary columns from the Mort2020
+Mort2020 <- subset(Mort2020, select = c("year", "monthdth", "educ2003", "sex", "ager12", "placdth", "marstat", "mandeath", "injury", "enicon_1", "ucod", "racer5"))
+
+#########RECODE ICD-10 CODES FOR DRUG DEATHS###########
+Mort2020$enicon_1 <- Mort2020$enicon_1 %>%
+  recode(T401 = "Heroine", T402 = "Other Opioids.", T400 = "Opium", T403 = "Methadone", T406 = "Unspecified Narcotic", T404 = "Synthetic Narcotic")
+
+OdDataset <- Mort2020 %>% #Still need this one for proportions!
+  mutate(ODyn = enicon_1)
+
+Mort2020$enicon_1 <- Mort2020$enicon_1 %>%
+  recode(T401 = "Heroine", T402 = "Other Opioids.", T400 = "Opium", T403 = "Methadone", T406 = "Unspecified Narcotic", T404 = "Synthetic Narcotics")
+#######################################################
+#Recode MonthDth Column
+#Mort2020$monthdth <- Mort2020$monthdth %>%
+#  recode(`1` = "Jan", `2` = "Feb", `3` = "Mar", `4` = "Apr",
+#         `5` = "May", `6` = "Jun", `7` = "Jul", `8` = "Aug", `9` = "Sep",
+#         `10` = "Oct", `11` = "Nov", `12` = "Dec")
+
+#Recode Educ2003 Column
+Mort2020$educ2003 <- Mort2020$educ2003 %>%
+  recode(`1` = "8th grade or less", `2` = "9 - 12th grade, no diploma", `3` = "high school graduate or GED completed", `4` = "some college credit, but no degree",
+         `5` = "Associate degree", `6` = "Bachelor’s degree", `7` = "Master’s degree", `8` = "Doctorate or professional degree", `9` = "Unknown")
+#Recode Sex Column
+Mort2020$sex <- Mort2020$sex %>%
+  recode(`M` = "Male", `F` = "Female")
+
+#Recode Educ2003 Column
+Mort2020$educ2003 <- Mort2020$educ2003 %>%
+  recode(`1` = "8th grade or less", `2` = "9 - 12th grade, no diploma", `3` = "high school graduate or GED completed", `4` = "some college credit, but no degree",
+         `5` = "Associate degree", `6` = "Bachelor’s degree", `7` = "Master’s degree", `8` = "Doctorate or professional degree", `9` = "Unknown")
+
+#Recode placdth Column
+Mort2020$placdth <- Mort2020$placdth %>%
+  recode(`1` = "Hospital, clinic or Medical Center - Inpatient", `2` = "Hospital, Clinic or Medical Center - Outpatient/ER", 
+         `3` = "Hospital, Clinic or Medical Center - Dead on Arrival", `4` = "Decedent’s home",
+         `5` = "Hospice facility", `6` = "Nursing home/long term care", `7` = "Other", `9` = "Place of death unknown")
+
+#Recode marstat Column
+Mort2020$marstat <- Mort2020$marstat %>%
+  recode(`S` = "Never married, single", `M` = "Married", `W` = "Widowed", `D` = "Divorced",
+         `U` = "Marital Status Unknown")
+
+#Recode mandeath
+Mort2020$mandeath <- Mort2020$mandeath %>%
+  recode(`1` = "Accident", `2` = "Suicide", `3` = "Homicide", `4` = "Pending investigation",
+         `5` = "Could not determine", `6` = "Self-Inflicted", `7` = "Natural", `Blank` = "Not specified")
+
+#Recode injury
+Mort2020$injury <- Mort2020$injury %>%
+  recode(`0` = "Home", `1` = "Residential institution", `2` = "School, other institution and public administrative area", `3` = "Sports and athletics area", 
+         `4` = "Street and highway", `5` = "Trade and service area", `6` = "Industrial and construction area", `7` = "Farm", `8` = "Other Specified Places",
+         `9` = "Unspecified place", `Blank` = "Causes other than W00-Y34, except Y06.- and Y07.")
+
+
+
+#########RECODE RACER5 COLUMN##########################
+Mort2020$racer5 <- Mort2020$racer5 %>%
+  recode(`0` = "Other", `1` = "White", `2` = "Black", `3` = "American Indian", `4` = "Asian or Pacific Islander")
+Mort2020$racer5 <- Mort2020$racer5 %>%
+  recode(`0` = "Other", `1` = "White", `2` = "Black", `3` = "American Indian", `4` = "Asian or Pacific Islander")
+
+unique(Mort2020$racer5)
+
+
+#############Recode ager12 column#####################
+Mort2020$ager12 <- Mort2020$ager12 %>%
+  recode(`01` = "Under 1 Year", `02` = "1-4 Years", `03` = "5-14 Years", `04` = "15-24 Years", `05` = "25-34 Years", `06` = "35-44 Years", `07` = "45-54 Years", `08` = '55-64 Years', `09` = "65-74 Years", `10` = "75-84 Years", `11` = "85 Years and Over", `12` = "Age not stated")
+
+Mort2020$ager12 <- factor(Mort2020$ager12, levels = c("Under 1 Year", "1-4 Years", "5-14 Years", "15-24 Years", "25-34 Years", "35-44 Years", "45-54 Years", "55-64 Years", "65-74 Years", "75-84 Years", "85 Years and Over", "Age not stated"))
+
+unique(Mort2020$ager12)
+
+#########ICD10CODES VECTOR############
+ICD10s <- c("Heroine", "Other Opioids", "Opium", "Methadone", "Unspecified Narcotic", "Synthetic Narcotics")
+
+```
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+gc() #Clears junk memory
+Mort2019 <- Mort2019 %>%
+  filter(ucod == "X40" | ucod == "X41" | ucod == "X42" | ucod == "X43" | ucod == "X44"| ucod == "X60"| ucod == "X61" | ucod == "X62" | ucod == "X63" | ucod == "X64"
+         | ucod == "X85" | ucod == "Y10" | ucod == "Y11" | ucod == "Y12" | ucod == "Y13" | ucod == "Y14") %>% 
+  filter(enicon_1 == "T400" | enicon_1 == "T401" | enicon_1 == "T402" | enicon_1 == "T403" | enicon_1 == "T404" | enicon_1 == "T406")
+
+#Remove unnecessary columns from the Mort2019
+Mort2019 <- subset(Mort2019, select = c("year", "monthdth", "educ2003", "sex", "ager12", "placdth", "marstat", "mandeath", "injury", "enicon_1", "ucod", "racer5"))
+
+#########RECODE ICD-10 CODES FOR DRUG DEATHS###########
+Mort2019$enicon_1 <- Mort2019$enicon_1 %>%
+  recode(T401 = "Heroine", T402 = "Other Opioids.", T400 = "Opium", T403 = "Methadone", T406 = "Unspecified Narcotic", T404 = "Synthetic Narcotic")
+
+OdDataset <- Mort2019 %>% #Still need this one for proportions!
+  mutate(ODyn = enicon_1)
+
+Mort2019$enicon_1 <- Mort2019$enicon_1 %>%
+  recode(T401 = "Heroine", T402 = "Other Opioids.", T400 = "Opium", T403 = "Methadone", T406 = "Unspecified Narcotic", T404 = "Synthetic Narcotics")
+#######################################################
+##Recode MonthDth Column
+#Mort2019$monthdth <- Mort2019$monthdth %>%
+#  recode(`1` = "Jan", `2` = "Feb", `3` = "Mar", `4` = "Apr",
+#         `5` = "May", `6` = "Jun", `7` = "Jul", `8` = "Aug", `9` = "Sep",
+#         `10` = "Oct", `11` = "Nov", `12` = "Dec")
+
+#Recode Educ2003 Column
+Mort2019$educ2003 <- Mort2019$educ2003 %>%
+  recode(`1` = "8th grade or less", `2` = "9 - 12th grade, no diploma", `3` = "high school graduate or GED completed", `4` = "some college credit, but no degree",
+         `5` = "Associate degree", `6` = "Bachelor’s degree", `7` = "Master’s degree", `8` = "Doctorate or professional degree", `9` = "Unknown")
+#Recode Sex Column
+Mort2019$sex <- Mort2019$sex %>%
+  recode(`M` = "Male", `F` = "Female")
+
+#Recode Educ2003 Column
+Mort2019$educ2003 <- Mort2019$educ2003 %>%
+  recode(`1` = "8th grade or less", `2` = "9 - 12th grade, no diploma", `3` = "high school graduate or GED completed", `4` = "some college credit, but no degree",
+         `5` = "Associate degree", `6` = "Bachelor’s degree", `7` = "Master’s degree", `8` = "Doctorate or professional degree", `9` = "Unknown")
+
+#Recode placdth Column
+Mort2019$placdth <- Mort2019$placdth %>%
+  recode(`1` = "Hospital, clinic or Medical Center - Inpatient", `2` = "Hospital, Clinic or Medical Center - Outpatient/ER", 
+         `3` = "Hospital, Clinic or Medical Center - Dead on Arrival", `4` = "Decedent’s home",
+         `5` = "Hospice facility", `6` = "Nursing home/long term care", `7` = "Other", `9` = "Place of death unknown")
+
+#Recode marstat Column
+Mort2019$marstat <- Mort2019$marstat %>%
+  recode(`S` = "Never married, single", `M` = "Married", `W` = "Widowed", `D` = "Divorced",
+         `U` = "Marital Status Unknown")
+
+#Recode mandeath
+Mort2019$mandeath <- Mort2019$mandeath %>%
+  recode(`1` = "Accident", `2` = "Suicide", `3` = "Homicide", `4` = "Pending investigation",
+         `5` = "Could not determine", `6` = "Self-Inflicted", `7` = "Natural", `Blank` = "Not specified")
+
+#Recode injury
+Mort2019$injury <- Mort2019$injury %>%
+  recode(`0` = "Home", `1` = "Residential institution", `2` = "School, other institution and public administrative area", `3` = "Sports and athletics area", 
+         `4` = "Street and highway", `5` = "Trade and service area", `6` = "Industrial and construction area", `7` = "Farm", `8` = "Other Specified Places",
+         `9` = "Unspecified place", `Blank` = "Causes other than W00-Y34, except Y06.- and Y07.")
+
+
+
+#########RECODE RACER5 COLUMN##########################
+Mort2019$racer5 <- Mort2019$racer5 %>%
+  recode(`0` = "Other", `1` = "White", `2` = "Black", `3` = "American Indian", `4` = "Asian or Pacific Islander")
+Mort2019$racer5 <- Mort2019$racer5 %>%
+  recode(`0` = "Other", `1` = "White", `2` = "Black", `3` = "American Indian", `4` = "Asian or Pacific Islander")
+
+unique(Mort2019$racer5)
+
+
+#############Recode ager12 column#####################
+Mort2019$ager12 <- Mort2019$ager12 %>%
+  recode(`01` = "Under 1 Year", `02` = "1-4 Years", `03` = "5-14 Years", `04` = "15-24 Years", `05` = "25-34 Years", `06` = "35-44 Years", `07` = "45-54 Years", `08` = '55-64 Years', `09` = "65-74 Years", `10` = "75-84 Years", `11` = "85 Years and Over", `12` = "Age not stated")
+
+Mort2019$ager12 <- factor(Mort2019$ager12, levels = c("Under 1 Year", "1-4 Years", "5-14 Years", "15-24 Years", "25-34 Years", "35-44 Years", "45-54 Years", "55-64 Years", "65-74 Years", "75-84 Years", "85 Years and Over", "Age not stated"))
+
+unique(Mort2019$ager12)
+
+#########ICD10CODES VECTOR############
+ICD10s <- c("Heroine", "Other Opioids", "Opium", "Methadone", "Unspecified Narcotic", "Synthetic Narcotics")
+
+MortComb <- rbind(Mort2020, Mort2019)
+MortComb$time <- make_date(MortComb$year, MortComb$monthdth)
+MortComb <- MortComb %>% 
+  filter(monthdth != 1 & monthdth != 2)
+```
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+TimePlotData <- MortComb %>% 
+  group_by(monthdth, year) %>% 
+  tally()
+
+TimePlotData$Year <- as.character(TimePlotData$year)
+TimePlot.lm <- lm(Year~n + monthdth, data=TimePlotData)
+
+TimePlot <- ggplot(data=TimePlotData, aes(x=monthdth, y=n, color=Year)) +
+  scale_colour_colorblind() +
+  geom_line(size=1.5) + 
+  xlab("Months") + 
+  ylab("Number of Opioid Overdose Deaths") +
+  ggtitle("Opioid Overdose Deaths over Time") +
+  labs(fill = "Year") +
+  scale_fill_colorblind() +
+  scale_x_continuous(limits = c(3,12), breaks = c(3, 4, 5, 6, 7, 8, 9, 10, 11, 12),
+                     labels = paste0(c("Mar", "Apr", "May", "Jun", "Jul", "Aug",
+                                       "Sep", "Oct", "Nov", "Dec"))) +
+  theme(axis.title.x = element_text(colour="Black", size=12),
+        axis.title.y = element_text(colour="Black", size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(colour="Black", size=10),
+        axis.text.y = element_text(colour="Black", size=10),
+        plot.title = element_text(colour="Black", size=14,hjust=0.6)) 
+
+
+summary(TimePlot.lm)
+```
+TimePlot
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+OpioidAnalysis <- MortComb %>% 
+  group_by(year, enicon_1) %>% 
+  tally()
+OpioidAnalysisGraph <- ggplot(data=OpioidAnalysis, aes(x=enicon_1, y=n, fill=as.character(year))) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  ggtitle("Change in Type of Opioid in Overdose Deaths in COVID-19 Pandemic") +
+  xlab("Type of Opioid") + 
+  ylab("Number of Overdoses") +
+  labs(fill = "Year") +
+  scale_fill_colorblind() +
+  theme(axis.title.x = element_text(colour="Black", size=12),
+        axis.title.y = element_text(colour="Black", size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(colour="Black", size=12),
+        axis.text.y = element_text(colour="Black", size=12),
+plot.title = element_text(colour="Black", size=14,hjust=0.6)) 
+OpioidAnalysis <- spread(OpioidAnalysis, key='enicon_1', value='n')
+chisq.test(OpioidAnalysis)
+
+  
+
+RaceAnalysis <- MortComb %>% 
+  group_by(year, racer5) %>% 
+  tally()
+RaceAnalysisGraph <- ggplot(data=RaceAnalysis, aes(x=racer5, y=n, fill=as.character(year))) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  ggtitle("Change in Racial Composition in Opioid Overdose Deaths in COVID-19 Pandemic") +
+  xlab("Race") + 
+  ylab("Number of Overdoses") +
+  labs(fill = "Year") +
+  scale_fill_colorblind() +
+  theme(axis.title.x = element_text(colour="Black", size=12),
+        axis.title.y = element_text(colour="Black", size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(colour="Black", size=12),
+        axis.text.y = element_text(colour="Black", size=12),
+        plot.title = element_text(colour="Black", size=14,hjust=0.6)) 
+RaceAnalysis <- spread(RaceAnalysis, key='racer5', value='n')
+chisq.test(RaceAnalysis)
+
+
+EducAnalysis <- MortComb %>% 
+  group_by(year, educ2003) %>% 
+  filter(educ2003 != "8th grade or less" & educ2003 != "some college credit, but no degree" & educ2003 != "Unknown") %>% 
+  tally()
+EducAnalysisGraph <- ggplot(data=EducAnalysis, aes(x=educ2003, y=n, fill=as.character(year))) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  ggtitle("Change in Educational Status Composition in Opioid Overdose Deaths in COVID-19 Pandemic") +
+  xlab("Educational Status") + 
+  ylab("Number of Overdoses") +
+  labs(fill = "Year") +
+  scale_fill_colorblind() +
+  theme(axis.title.x = element_text(colour="Black", size=12),
+        axis.title.y = element_text(colour="Black", size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(colour="Black", size=8),
+        axis.text.y = element_text(colour="Black", size=12),
+plot.title = element_text(colour="Black", size=14,hjust=0.6))
+
+EducAnalysis <- spread(EducAnalysis, key='educ2003', value='n')
+chisq.test(EducAnalysis)
+
+```
+OpioidAnalysisGraph
+RaceAnalysisGraph
+EducAnalysisGraph
+
+
+
+
+
+```{r}
+Mort2020ND <- Mort2020 %>%
+  filter(monthdth != 1 & monthdth != 2)
+Mort2019ND <- Mort2019 %>%
+  filter(monthdth != 1 & monthdth != 2)
+
+
+Mortreg <- rbind(Mort2020ND, Mort2019ND, fill = TRUE)
+
+Mortregintermediate <- Mortreg %>%
+    mutate(OverdoseDeath = enicon_1) 
+Mortregintermediate$OverdoseDeath <- dplyr::recode(Mortregintermediate$OverdoseDeath, T401 = "OD", T402 = "OD", T403 = "OD", T406 = "OD", T404 = "OD")
+Mortregintermediate$OverdoseDeath[Mortregintermediate$OverdoseDeath != "OD"] <- "Non-OD"
+#Code creates a dataframe with a label indicating whether the death was an OD or not
+
+```
+  
+Proportion of deaths from opioids, pre and post covid
+```{r}
+
+Mortregintermediate %>%
+  group_by(year) %>%
+  summarize(percentOD =  (sum(OverdoseDeath == "OD") / length(OverdoseDeath)) * 100, ndeaths = length(OverdoseDeath), nOpioid = sum(OverdoseDeath == "OD")) %>%
+  ggplot(aes(x = year, y = percentOD)) +
+  geom_col()+
+  scale_x_continuous(breaks = c(2019,2020))+
+  ylim(0,3)+
+  xlab("Year") +
+  ylab("% of Total Deaths From Opioid Overdose")+
+  ggtitle("Percenteage of Total Deaths from Opioid Overdose by Year")+
+  scale_fill_colorblind()
+  
+
+prop.test(x =c(1051, 1800), n = c(127581,156103))
+```
+
+```{r}
+Mortregintermediate$ager12 <- Mortregintermediate$ager12 %>%
+  dplyr::recode(`01` = "Under 1 Year", `02` = "1-4 Years", `03` = "5-14 Years", `04` = "15-24 Years", `05` = "25-34 Years", `06` = "35-44 Years", `07` = "45-54 Years", `08` = '55-64 Years', `09` = "65-74 Years", `10` = "75-84 Years", `11` = "85 Years and Over", `12` = "Age not stated") 
+
+Mortregintermediate$ager12 <- factor(Mortregintermediate$ager12, levels = c("Under 1 Year", "1-4 Years", "5-14 Years", "15-24 Years", "25-34 Years", "35-44 Years", "45-54 Years", "55-64 Years", "65-74 Years", "75-84 Years", "85 Years and Over", "Age not stated"))
+
+Mortregintermediate %>%
+  filter(ager12 != "Under 1 Year" & ager12 != "Age not stated" & ager12 != "85 Years and Over") %>%
+  group_by(ager12,year) %>%
+  summarize(percentOD =  (sum(OverdoseDeath == "OD") / length(OverdoseDeath)) * 100) %>%
+  ggplot(aes(x = ager12, y = percentOD, fill = as.factor(year))) +
+  geom_col(position = "dodge")+
+  coord_flip()+
+  xlab("Age Group")+
+  ylab("Percent of Deaths From Overdose")+
+  ggtitle("Percentage of Deaths From Overdose By Age Group and Year")+
+  scale_fill_colorblind(name = "Year")
+
+```
+
