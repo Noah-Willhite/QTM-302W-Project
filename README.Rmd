@@ -1,6 +1,6 @@
 ---
-title: QTM 302W Project
-author: AUTOR NAME
+title: An Epidemic Within the Pandemic: Changes in Opioid Overdose Death Characteristics During the COVID-19 Pandemic
+author: Noah Willite, Akash Shanmugam
 output: github_document
 date: `r format(Sys.Date(), "%d-%m-%Y")`
 editor_options:
@@ -8,7 +8,7 @@ editor_options:
 ---
 
 <!-- Short Description  -->
-This is a short description of the project
+We centered our analyses on characterizing the differences in opioid overdose rates among demographic groups before the pandemic and during the pandemic (2019 -2020). We hope that by identifying these trends, our work can inform policy initiatives to help those suffering from and affected by opioid use disorder. 
 
 *Updated on `r Sys.time()`*
 
@@ -51,4 +51,4 @@ General information about the project (study system, goals, etc)
 Project is: _in progress_
 
 ## Contact
-Created by [Autor name](website_URL)
+Created by [Noah Willhite](https://mybinder.org/v2/gh/Noah-Willhite/QTM-302W-Project/main?urlpath=rstudio)
